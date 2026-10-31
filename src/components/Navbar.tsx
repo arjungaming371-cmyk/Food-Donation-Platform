@@ -89,6 +89,12 @@ export default function Navbar() {
           {/* Desktop Nav Links */}
           <div className="hidden md:flex items-center gap-6">
             <Link
+              href="/demo"
+              className="text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 shadow-sm"
+            >
+              <span>▶ Auto-Demo Walkthrough</span>
+            </Link>
+            <Link
               href="/recipient/explore"
               className="text-sm font-medium text-gray-600 hover:text-forest-700 transition-colors"
             >

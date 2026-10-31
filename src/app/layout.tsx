@@ -1,13 +1,10 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import DemoBar from '@/components/DemoBar';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
   title: 'FoodBridge — Zero Waste Food Donation & Redistribution Platform',
@@ -22,7 +19,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} font-sans min-h-screen flex flex-col bg-[#fafaf9] text-gray-900 antialiased`}>
+      <body className="font-sans min-h-screen flex flex-col bg-[#fafaf9] text-gray-900 antialiased">
         <AuthProvider>
           <LanguageProvider>
             <DemoBar />

@@ -97,6 +97,13 @@ export default function HomePage() {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
               <Link
+                href="/demo"
+                className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-gray-950 font-black text-sm shadow-lg shadow-amber-500/20 transition-all hover:scale-105 flex items-center justify-center gap-2"
+              >
+                <span>▶ Auto-Demo Video Mode</span>
+              </Link>
+
+              <Link
                 href="/donor/create-listing"
                 className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-forest-700 hover:bg-forest-800 text-white font-bold text-sm shadow-lg shadow-forest-700/25 transition-all hover:scale-105 flex items-center justify-center gap-2"
               >

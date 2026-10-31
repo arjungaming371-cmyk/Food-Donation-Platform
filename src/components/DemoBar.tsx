@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Sparkles, Utensils, HeartHandshake, ShieldCheck, Key } from 'lucide-react';
 
@@ -25,6 +26,14 @@ export default function DemoBar() {
         </div>
 
         <div className="flex items-center flex-wrap gap-2">
+          <Link
+            href="/demo"
+            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-gray-950 px-3 py-1 rounded-full font-bold text-[11px] shadow-sm transition-all"
+            title="Watch the Automated Step-by-Step Demo Process"
+          >
+            <span>▶ Auto-Demo Video Mode</span>
+          </Link>
+
           <button
             onClick={() => demoLogin('DONOR')}
             className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 active:bg-white/30 px-2.5 py-1 rounded-full text-white transition-all font-medium border border-white/10"
