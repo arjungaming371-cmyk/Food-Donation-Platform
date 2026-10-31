@@ -6,12 +6,10 @@ node_modules/
 # Next.js build output
 .next/
 out/
+.vercel/
 
-# Database
-prisma/dev.db
-prisma/dev.db-journal
-dev.db
-dev.db-journal
+# Database journals & local temp
+*.db-journal
 
 # Environment variables
 .env
