@@ -6,6 +6,18 @@
 
 ---
 
+### 🚀 Key Submission & Evaluation Links
+
+- 🌐 **Live Production Prototype:** [https://food-donation-platform-blond.vercel.app](https://food-donation-platform-blond.vercel.app)
+- 🎬 **Interactive Video Walkthrough (with Natural Female Voiceover):** [https://food-donation-platform-blond.vercel.app/demo](https://food-donation-platform-blond.vercel.app/demo)
+- 💻 **GitHub Repository:** [https://github.com/arjungaming371-cmyk/Food-Donation-Platform](https://github.com/arjungaming371-cmyk/Food-Donation-Platform)
+- 🏗️ **System Architecture Diagram:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- 🗄️ **Database Schema & ER Diagram:** [docs/DATABASE_ERD.md](docs/DATABASE_ERD.md)
+- 📚 **REST API & Postman Specification:** [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md)
+- 📊 **Project Pitch Deck & Presentation:** [PRESENTATION.md](PRESENTATION.md)
+
+---
+
 ## 🌟 Executive Summary
 
 In metropolitan hubs like Hyderabad, metric tons of safe, freshly prepared surplus meals and perishable goods are discarded daily by hotels, restaurants, banquets, and bakeries. Concurrently, orphanages, homeless shelters, and charity kitchens struggle daily to secure meal provisions.
