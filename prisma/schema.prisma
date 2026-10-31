@@ -1,0 +1,175 @@
+// Prisma schema for FoodBridge - HACK-P197 Food Donation & Redistribution Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String                @id @default(cuid())
+  email           String                @unique
+  password        String
+  name            String
+  role            String                @default("DONOR") // DONOR, RECIPIENT, ADMIN
+  phone           String?
+  address         String?
+  city            String                @default("Hyderabad")
+  latitude        Float?
+  longitude       Float?
+  isSuspended     Boolean               @default(false)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  donorProfile    DonorProfile?
+  orgProfile      OrganizationProfile?
+  listings        FoodListing[]
+  requests        DonationRequest[]
+  notifications   Notification[]
+  reportsMade     Report[]              @relation("ReporterRelation")
+  reportsAgainst  Report[]              @relation("ReportedUserRelation")
+  adminLogs       AdminAuditLog[]
+  statusHistories DonationStatusHistory[]
+}
+
+model DonorProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName        String
+  businessType        String   // Restaurant, Hotel, Caterer, Grocery, Community Kitchen
+  fssaiNumber         String?
+  operatingHours      String?
+  pickupInstructions  String?
+  verified            Boolean  @default(true)
+  safetyPledgeAccepted Boolean @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model OrganizationProfile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgName               String
+  orgType               String   // NGO, Charitable Organization, Orphanage, Shelter, Community Group
+  registrationNumber    String?
+  estimatedPeopleServed Int      @default(100)
+  serviceArea           String?
+  beneficiaryDescription String?
+  verified              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model FoodListing {
+  id                        String                  @id @default(cuid())
+  donorId                   String
+  donor                     User                    @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  title                     String
+  description               String
+  category                  String                  // Cooked Meals, Bakery & Bread, Fruits & Vegetables, Packaged Food, Dairy
+  imageUrl                  String
+  totalQuantity             Float
+  availableQuantity         Float
+  unit                      String                  // kg, packets, pieces, servings
+  dietaryType               String                  // VEG, NON_VEG, VEGAN
+  allergens                 String?
+  cookedOrPreparedAt        DateTime
+  expiryOrBestBefore        DateTime
+  storageCondition          String                  // Hot / Insulated, Refrigerated, Room Temperature, Frozen
+  handlingInstructions      String
+  donorDeclarationConfirmed Boolean                 @default(true)
+  pickupAddress             String
+  pickupCity                String                  @default("Hyderabad")
+  latitude                  Float
+  longitude                 Float
+  pickupStartTime           DateTime
+  pickupEndTime             DateTime
+  status                    String                  @default("AVAILABLE") // AVAILABLE, RESERVED, COMPLETED, EXPIRED, REMOVED
+  isReported                Boolean                 @default(false)
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+
+  requests                  DonationRequest[]
+  statusHistory             DonationStatusHistory[]
+  reports                   Report[]
+}
+
+model DonationRequest {
+  id                        String                  @id @default(cuid())
+  listingId                 String
+  listing                   FoodListing             @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  recipientId               String
+  recipient                 User                    @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  requestedQuantity         Float
+  status                    String                  @default("PENDING") // PENDING, ACCEPTED, REJECTED, CANCELLED, PICKED_UP, COMPLETED
+  pickupVerificationCode     String                  // 6-digit PIN / QR verification token
+  donorConfirmedHandover     Boolean                 @default(false)
+  recipientConfirmedPickup  Boolean                 @default(false)
+  donorHandoverAt           DateTime?
+  recipientPickupAt         DateTime?
+  cancellationReason        String?
+  notes                     String?
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+
+  statusHistory             DonationStatusHistory[]
+}
+
+model DonationStatusHistory {
+  id              String           @id @default(cuid())
+  listingId       String?
+  listing         FoodListing?     @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  requestId       String?
+  request         DonationRequest? @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorId         String
+  actor           User             @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  actorRole       String
+  previousStatus  String?
+  newStatus       String
+  note            String?
+  createdAt       DateTime         @default(now())
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  message     String
+  type        String   // REQUEST_RECEIVED, REQUEST_ACCEPTED, REQUEST_REJECTED, REQUEST_CANCELLED, PICKUP_CONFIRMED, ADMIN_ACTION
+  link        String?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Report {
+  id             String       @id @default(cuid())
+  reporterId     String
+  reporter       User         @relation("ReporterRelation", fields: [reporterId], references: [id], onDelete: Cascade)
+  listingId      String?
+  listing        FoodListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  reportedUserId String?
+  reportedUser   User?        @relation("ReportedUserRelation", fields: [reportedUserId], references: [id], onDelete: SetNull)
+  reason         String       // Incorrect info, Expired, Inappropriate, Suspicious, Unsafe
+  details        String
+  status         String       @default("PENDING") // PENDING, INVESTIGATING, RESOLVED, DISMISSED
+  adminNotes     String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  adminId     String
+  admin       User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  action      String   // REMOVE_LISTING, SUSPEND_USER, RESTORE_USER, RESOLVE_REPORT
+  targetType  String   // LISTING, USER, REPORT
+  targetId    String
+  details     String
+  createdAt   DateTime @default(now())
+}
