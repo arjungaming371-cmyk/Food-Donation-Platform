@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   Play,
@@ -23,6 +23,9 @@ import {
   Flame,
   Activity,
   Layers,
+  Volume2,
+  VolumeX,
+  Mic,
 } from 'lucide-react';
 
 interface DemoStep {
@@ -32,6 +35,7 @@ interface DemoStep {
   title: string;
   subtitle: string;
   description: string;
+  voiceNarration: string;
   codeSnippet: string;
   codeLanguage: string;
   codeTitle: string;
@@ -48,6 +52,8 @@ const DEMO_STEPS: DemoStep[] = [
     subtitle: 'Paradise Biryani lists 15 kg of surplus Vegetable Dum Biryani',
     description:
       'The restaurant logs surplus food into FoodBridge. It records kitchen preparation time, safe 4-hour thermal window (> 60°C), allergens, and signs the mandatory food-safety declaration.',
+    voiceNarration:
+      'Step 1: Food Listing. Paradise Biryani lists 15 kilograms of surplus Vegetable Dum Biryani. The restaurant specifies thermal storage above 60 degrees Celsius, declares allergen details, and signs the mandatory Food Safety Pledge before publishing.',
     codeTitle: 'POST /api/listings (Database Transaction & Safety Gate)',
     codeLanguage: 'typescript',
     codeSnippet: `// 1. Enforce Mandatory Food Safety Declaration
@@ -114,6 +120,8 @@ const listing = await prisma.$transaction(async (tx) => {
     subtitle: 'Hope Community Foundation matches at 94% Compatibility',
     description:
       'The NGO logs in. The deterministic matching engine scores available food batches against the NGO’s GPS location (Haversine formula), daily capacity (250 people), and dietary parameters.',
+    voiceNarration:
+      'Step 2: Smart NGO Matching. Hope Community Foundation discovers the listing. Our deterministic matching algorithm evaluates proximity, capacity for 250 beneficiaries, and pickup timeline, calculating a 94 percent compatibility score.',
     codeTitle: 'src/lib/matching.ts (Multi-Factor Compatibility Engine)',
     codeLanguage: 'typescript',
     codeSnippet: `export function calculateSmartMatch(listing, org): MatchResult {
@@ -168,6 +176,8 @@ const listing = await prisma.$transaction(async (tx) => {
     subtitle: 'NGO requests 10 kg; stock locks from 15 kg down to 5 kg',
     description:
       'Hope Community Foundation requests 10 kg. The donor accepts. An ACID database transaction reserves the exact quantity and updates the listing stock to 5 kg, preventing any duplicate reservations or negative stock overdrafts.',
+    voiceNarration:
+      'Step 3: Safe Reservation. The NGO requests 10 kilograms. An ACID database transaction instantly reserves the batch and locks remaining inventory to 5 kilograms, preventing double-booking and stock overdrafts.',
     codeTitle: 'POST /api/requests/[id]/status (ACID Lock on Quantity)',
     codeLanguage: 'typescript',
     codeSnippet: `await prisma.$transaction(async (tx) => {
@@ -224,6 +234,8 @@ const listing = await prisma.$transaction(async (tx) => {
     subtitle: 'Driver arrives at loading dock; 6-digit PIN & QR code scanned',
     description:
       'Hope Community driver arrives at the kitchen with thermal food carriers. The driver shows the dynamic QR code and 6-digit PIN (849201). The donor verifies the code, guaranteeing physical custody transfer.',
+    voiceNarration:
+      'Step 4: Dynamic QR Verification. The NGO collection van arrives at the dispatch dock. The driver presents a dynamic QR code and 6-digit security PIN 849201. The donor verifies the code, guaranteeing physical custody transfer.',
     codeTitle: 'src/lib/qrcode.ts & Handover Verification Endpoint',
     codeLanguage: 'typescript',
     codeSnippet: `// 1. Generate encrypted QR verification token
@@ -276,6 +288,8 @@ await prisma.$transaction(async (tx) => {
     subtitle: '+10 kg rescued • +25 meals delivered • +25 kg CO2e averted',
     description:
       'Upon completed verification, the impact engine aggregates verified food weight, converts it to 400g adult meal equivalents, and computes greenhouse gas emissions diverted from urban landfills.',
+    voiceNarration:
+      'Step 5: Real-Time Impact Ledger. The impact engine converts the verified food into 25 meals served to vulnerable families and prevents 25 kilograms of greenhouse gas emissions from urban landfills.',
     codeTitle: 'src/lib/impact.ts (Real-Time Impact Aggregation)',
     codeLanguage: 'typescript',
     codeSnippet: `export async function getLiveImpactMetrics(): Promise<ImpactMetrics> {
@@ -322,6 +336,8 @@ await prisma.$transaction(async (tx) => {
     subtitle: 'Complete chronological transparency for platform oversight',
     description:
       'The platform administrator reviews the full transaction lifecycle in the live audit log. Admins have immediate powers to inspect listings, investigate reported flags, or suspend fraudulent accounts.',
+    voiceNarration:
+      'Step 6: Administrative Oversight. The platform administrator inspects the immutable audit trail, ensuring complete transparency, food safety compliance, and regulatory traceability across every transaction.',
     codeTitle: 'GET /api/admin/stats & Immutable Audit Trail Query',
     codeLanguage: 'typescript',
     codeSnippet: `// Complete chronological audit log of all platform state changes
@@ -357,10 +373,67 @@ const auditTrail = await prisma.donationStatusHistory.findMany({
 export default function InteractiveDemoPage() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [speed, setSpeed] = useState<number>(4000); // 4 seconds per step
+  const [speed, setSpeed] = useState<number>(6000); // 6 seconds per step to allow speech
   const [activeTab, setActiveTab] = useState<'CODE' | 'PAYLOAD'>('CODE');
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const step = DEMO_STEPS[currentStepIndex];
+
+  // Voice narration helper using native Web Speech Synthesis API
+  const speakCurrentStep = (text: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+    window.speechSynthesis.cancel(); // Stop any active speech
+
+    if (!isAudioEnabled) {
+      setIsSpeaking(false);
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.lang = 'en-US';
+
+    // Pick a natural English voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const englishVoice = voices.find(
+      (v) =>
+        (v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha') || v.name.includes('Zira'))) ||
+        v.lang === 'en-US'
+    );
+    if (englishVoice) {
+      utterance.voice = englishVoice;
+    }
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Trigger speech when step changes
+  useEffect(() => {
+    if (isAudioEnabled) {
+      speakCurrentStep(step.voiceNarration);
+    } else {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setIsSpeaking(false);
+    }
+  }, [currentStepIndex, isAudioEnabled]);
+
+  // Clean up speech on unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   // Auto-play timer
   useEffect(() => {
@@ -392,8 +465,20 @@ export default function InteractiveDemoPage() {
   };
 
   const handleReset = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     setIsPlaying(false);
     setCurrentStepIndex(0);
+  };
+
+  const toggleAudio = () => {
+    const nextState = !isAudioEnabled;
+    setIsAudioEnabled(nextState);
+    if (!nextState && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
   };
 
   return (
@@ -404,7 +489,7 @@ export default function InteractiveDemoPage() {
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-forest-700 bg-forest-100 px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              Automated Walkthrough Engine
+              Automated Audio Walkthrough Engine
             </span>
             <span className="text-xs text-gray-400 font-mono">HACK-P197 Live Demo Simulator</span>
           </div>
@@ -412,12 +497,45 @@ export default function InteractiveDemoPage() {
             End-to-End Workflow & Architecture Simulator
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Watch the complete surplus food journey from kitchen listing to QR handover, with code execution and database transactions visible in real time.
+            Watch and listen to the complete surplus food journey from kitchen listing to QR handover, with synchronized voiceover, live UI, and real code execution.
           </p>
         </div>
 
-        {/* Playback Controls */}
-        <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm">
+        {/* Playback & Audio Controls */}
+        <div className="flex items-center flex-wrap gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm">
+          {/* Audio Voiceover Toggle Button */}
+          <button
+            onClick={toggleAudio}
+            className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+              isAudioEnabled
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                : 'bg-gray-100 text-gray-500 hover:text-gray-900'
+            }`}
+            title={isAudioEnabled ? 'Mute Voice Narration' : 'Enable Voice Narration'}
+          >
+            {isAudioEnabled ? (
+              <>
+                <Volume2 className="w-4 h-4 text-emerald-600" />
+                <span className="flex items-center gap-1">
+                  Voiceover ON
+                  {isSpeaking && (
+                    <span className="flex gap-0.5 items-end h-3 ml-1">
+                      <span className="w-1 bg-emerald-500 h-2 rounded-full animate-pulse"></span>
+                      <span className="w-1 bg-emerald-600 h-3 rounded-full animate-bounce"></span>
+                      <span className="w-1 bg-emerald-500 h-1.5 rounded-full animate-pulse"></span>
+                    </span>
+                  )}
+                </span>
+              </>
+            ) : (
+              <>
+                <VolumeX className="w-4 h-4 text-gray-400" />
+                <span>Voiceover Muted</span>
+              </>
+            )}
+          </button>
+
+          {/* Auto-Play Toggle */}
           <button
             onClick={() => setIsPlaying(!isPlaying)}
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${
@@ -429,7 +547,7 @@ export default function InteractiveDemoPage() {
             {isPlaying ? (
               <>
                 <Pause className="w-4 h-4" />
-                <span>Pause Auto-Demo</span>
+                <span>Pause</span>
               </>
             ) : (
               <>
@@ -452,10 +570,32 @@ export default function InteractiveDemoPage() {
             onChange={(e) => setSpeed(Number(e.target.value))}
             className="text-xs font-semibold text-gray-600 bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5 focus:outline-none"
           >
-            <option value={6000}>Speed: 0.7x (Slow)</option>
-            <option value={4000}>Speed: 1.0x (Normal)</option>
-            <option value={2500}>Speed: 1.5x (Fast)</option>
+            <option value={7000}>Speed: Slow (7s)</option>
+            <option value={5500}>Speed: Normal (5.5s)</option>
+            <option value={4000}>Speed: Fast (4s)</option>
           </select>
+        </div>
+      </div>
+
+      {/* Synchronized Voiceover Subtitles Banner */}
+      <div className="bg-forest-900 text-white p-4 rounded-2xl shadow-md border border-forest-800 mb-8 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-forest-800 text-amber-300 flex items-center justify-center flex-shrink-0">
+          <Mic className={`w-4 h-4 ${isSpeaking ? 'animate-bounce text-emerald-400' : ''}`} />
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+              Audio Explanation (Live Narration):
+            </span>
+            {isSpeaking && (
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-mono animate-pulse">
+                Speaking...
+              </span>
+            )}
+          </div>
+          <p className="text-xs sm:text-sm text-gray-100 font-medium leading-snug mt-0.5">
+            "{step.voiceNarration}"
+          </p>
         </div>
       </div>
 
