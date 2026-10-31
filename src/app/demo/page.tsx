@@ -26,6 +26,8 @@ import {
   Volume2,
   VolumeX,
   Mic,
+  Headphones,
+  Sliders,
 } from 'lucide-react';
 
 interface DemoStep {
@@ -370,17 +372,116 @@ const auditTrail = await prisma.donationStatusHistory.findMany({
   },
 ];
 
+// Prioritized keyword lists to detect and match natural human female voices
+const FEMALE_VOICE_KEYWORDS = [
+  'natural', 'jenny', 'aria', 'zira', 'samantha', 'victoria', 
+  'karen', 'sonia', 'moira', 'tessa', 'ava', 'emma', 'sophia', 
+  'google us english', 'female', 'neural2-f', 'wavenet-c', 'wavenet-e', 'wavenet-f'
+];
+
+const MALE_VOICE_KEYWORDS = [
+  'david', 'mark', 'george', 'daniel', 'richard', 'guy', 'male', 'man', 'james', 'brian'
+];
+
+function isLikelyFemaleVoice(voice: SpeechSynthesisVoice): boolean {
+  const name = voice.name.toLowerCase();
+  if (MALE_VOICE_KEYWORDS.some((m) => name.includes(m))) return false;
+  return FEMALE_VOICE_KEYWORDS.some((f) => name.includes(f));
+}
+
+function selectBestNaturalFemaleVoice(available: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  if (!available || available.length === 0) return null;
+
+  // Priority 1: High-fidelity Microsoft Natural Online Female voices (Jenny / Aria)
+  const msNatural = available.find(
+    (v) =>
+      v.name.toLowerCase().includes('natural') &&
+      (v.name.toLowerCase().includes('jenny') || v.name.toLowerCase().includes('aria'))
+  );
+  if (msNatural) return msNatural;
+
+  // Priority 2: Any Microsoft Natural voice that is not explicitly male
+  const anyNatural = available.find(
+    (v) =>
+      v.name.toLowerCase().includes('natural') &&
+      !MALE_VOICE_KEYWORDS.some((m) => v.name.toLowerCase().includes(m))
+  );
+  if (anyNatural) return anyNatural;
+
+  // Priority 3: Apple Studio Female Voices (Samantha, Victoria, Karen, Moira)
+  const appleStudioFemale = available.find((v) =>
+    ['samantha', 'victoria', 'karen', 'moira'].some((n) => v.name.toLowerCase().includes(n))
+  );
+  if (appleStudioFemale) return appleStudioFemale;
+
+  // Priority 4: Google US English Female (Chrome/Android)
+  const googleFemale = available.find(
+    (v) =>
+      v.name.includes('Google US English') ||
+      (v.name.includes('Google') && v.lang.startsWith('en') && !v.name.toLowerCase().includes('male'))
+  );
+  if (googleFemale) return googleFemale;
+
+  // Priority 5: Microsoft Zira (Standard Windows Female)
+  const zira = available.find((v) => v.name.toLowerCase().includes('zira'));
+  if (zira) return zira;
+
+  // Priority 6: Any English voice with female indicator
+  const englishFemale = available.find(
+    (v) => v.lang.startsWith('en') && isLikelyFemaleVoice(v)
+  );
+  if (englishFemale) return englishFemale;
+
+  // Priority 7: Any English voice not explicitly male
+  const englishNeutral = available.find(
+    (v) => v.lang.startsWith('en') && !MALE_VOICE_KEYWORDS.some((m) => v.name.toLowerCase().includes(m))
+  );
+  if (englishNeutral) return englishNeutral;
+
+  // Fallback: Any English voice or first available
+  return available.find((v) => v.lang.startsWith('en')) || available[0] || null;
+}
+
 export default function InteractiveDemoPage() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [speed, setSpeed] = useState<number>(6000); // 6 seconds per step to allow speech
+  const [speed, setSpeed] = useState<number>(6500); // 6.5 seconds per step for clear speech
   const [activeTab, setActiveTab] = useState<'CODE' | 'PAYLOAD'>('CODE');
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
+  // Natural Female Voice State
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>('');
+  const [voicePitch, setVoicePitch] = useState<number>(1.08); // Warm, friendly natural female timbre
+  const [voiceRate, setVoiceRate] = useState<number>(0.92); // Calm, professional narration pace
+
   const step = DEMO_STEPS[currentStepIndex];
 
-  // Voice narration helper using native Web Speech Synthesis API
+  // Load and asynchronously detect available system voices
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+    const loadVoices = () => {
+      const available = window.speechSynthesis.getVoices();
+      if (available && available.length > 0) {
+        setVoices(available);
+        const bestFemale = selectBestNaturalFemaleVoice(available);
+        if (bestFemale) {
+          setSelectedVoiceURI(bestFemale.voiceURI);
+        }
+      }
+    };
+
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
+  // Voice narration helper using natural human female voice
   const speakCurrentStep = (text: string) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
@@ -392,19 +493,18 @@ export default function InteractiveDemoPage() {
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+    utterance.pitch = voicePitch;
+    utterance.rate = voiceRate;
     utterance.lang = 'en-US';
 
-    // Pick a natural English voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const englishVoice = voices.find(
-      (v) =>
-        (v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha') || v.name.includes('Zira'))) ||
-        v.lang === 'en-US'
-    );
-    if (englishVoice) {
-      utterance.voice = englishVoice;
+    // Locate chosen voice or best natural female voice
+    const chosenVoice =
+      voices.find((v) => v.voiceURI === selectedVoiceURI) ||
+      selectBestNaturalFemaleVoice(voices) ||
+      selectBestNaturalFemaleVoice(window.speechSynthesis.getVoices());
+
+    if (chosenVoice) {
+      utterance.voice = chosenVoice;
     }
 
     utterance.onstart = () => setIsSpeaking(true);
@@ -412,6 +512,12 @@ export default function InteractiveDemoPage() {
     utterance.onerror = () => setIsSpeaking(false);
 
     window.speechSynthesis.speak(utterance);
+  };
+
+  const handleTestVoice = () => {
+    speakCurrentStep(
+      'Hello! I am your FoodBridge voice narrator. Welcome to the automated walkthrough of our food donation platform.'
+    );
   };
 
   // Trigger speech when step changes
@@ -517,7 +623,7 @@ export default function InteractiveDemoPage() {
               <>
                 <Volume2 className="w-4 h-4 text-emerald-600" />
                 <span className="flex items-center gap-1">
-                  Voiceover ON
+                  Female Voice ON
                   {isSpeaking && (
                     <span className="flex gap-0.5 items-end h-3 ml-1">
                       <span className="w-1 bg-emerald-500 h-2 rounded-full animate-pulse"></span>
@@ -533,6 +639,16 @@ export default function InteractiveDemoPage() {
                 <span>Voiceover Muted</span>
               </>
             )}
+          </button>
+
+          {/* Test Voice Button */}
+          <button
+            onClick={handleTestVoice}
+            className="px-3 py-2 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1.5 transition-all"
+            title="Preview natural human female voice sample"
+          >
+            <Headphones className="w-3.5 h-3.5 text-amber-600" />
+            <span>Test Voice</span>
           </button>
 
           {/* Auto-Play Toggle */}
@@ -570,10 +686,111 @@ export default function InteractiveDemoPage() {
             onChange={(e) => setSpeed(Number(e.target.value))}
             className="text-xs font-semibold text-gray-600 bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5 focus:outline-none"
           >
-            <option value={7000}>Speed: Slow (7s)</option>
-            <option value={5500}>Speed: Normal (5.5s)</option>
-            <option value={4000}>Speed: Fast (4s)</option>
+            <option value={7500}>Slide Delay: Slow (7.5s)</option>
+            <option value={6500}>Slide Delay: Normal (6.5s)</option>
+            <option value={4500}>Slide Delay: Fast (4.5s)</option>
           </select>
+        </div>
+      </div>
+
+      {/* Natural Female Voice Configuration Bar */}
+      <div className="bg-emerald-950 text-emerald-100 p-3 sm:p-4 rounded-2xl shadow-sm border border-emerald-900 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-emerald-800 text-emerald-200 flex items-center justify-center flex-shrink-0">
+            <Sliders className="w-4 h-4 text-emerald-300" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+                Natural Human Female Voice Settings
+              </span>
+              <span className="text-[10px] bg-emerald-800/80 text-emerald-200 px-2 py-0.5 rounded-full font-semibold border border-emerald-700">
+                Studio Natural Cadence (0.92x, 1.08 Pitch)
+              </span>
+            </div>
+            <p className="text-xs text-emerald-200/90 mt-0.5">
+              Prioritizes Microsoft Jenny / Aria Natural, Google Female & Apple Samantha with warm conversational pacing.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center flex-wrap gap-2">
+          {/* Voice selector dropdown */}
+          <div className="flex items-center gap-1.5 bg-emerald-900/90 border border-emerald-700 rounded-xl px-2.5 py-1 text-xs">
+            <span className="text-emerald-300 font-medium text-[11px]">Voice:</span>
+            <select
+              value={selectedVoiceURI}
+              onChange={(e) => {
+                setSelectedVoiceURI(e.target.value);
+                const matched = voices.find((v) => v.voiceURI === e.target.value);
+                if (matched && isAudioEnabled) {
+                  speakCurrentStep(`Voice changed to ${matched.name.split(' - ')[0]}.`);
+                }
+              }}
+              className="bg-transparent text-emerald-100 text-xs font-semibold focus:outline-none max-w-[200px] sm:max-w-[260px] truncate"
+            >
+              {voices.length === 0 ? (
+                <option value="" className="bg-gray-800 text-white">
+                  Natural Female Voice (Default System)
+                </option>
+              ) : (
+                [...voices]
+                  .sort((a, b) => {
+                    const aFem = isLikelyFemaleVoice(a) ? 1 : 0;
+                    const bFem = isLikelyFemaleVoice(b) ? 1 : 0;
+                    return bFem - aFem;
+                  })
+                  .map((v) => (
+                    <option key={v.voiceURI} value={v.voiceURI} className="bg-gray-900 text-white">
+                      {isLikelyFemaleVoice(v) ? `⭐ [Female] ${v.name}` : v.name}
+                    </option>
+                  ))
+              )}
+            </select>
+          </div>
+
+          {/* Voice Pacing Dropdown */}
+          <div className="flex items-center gap-1.5 bg-emerald-900/90 border border-emerald-700 rounded-xl px-2.5 py-1 text-xs">
+            <span className="text-emerald-300 font-medium text-[11px]">Pace:</span>
+            <select
+              value={voiceRate}
+              onChange={(e) => setVoiceRate(Number(e.target.value))}
+              className="bg-transparent text-emerald-100 text-xs font-semibold focus:outline-none"
+            >
+              <option value={0.88} className="bg-gray-900 text-white">
+                0.88x (Relaxed)
+              </option>
+              <option value={0.92} className="bg-gray-900 text-white">
+                0.92x (Natural Human)
+              </option>
+              <option value={1.0} className="bg-gray-900 text-white">
+                1.00x (Standard)
+              </option>
+              <option value={1.08} className="bg-gray-900 text-white">
+                1.08x (Brisk)
+              </option>
+            </select>
+          </div>
+
+          {/* Voice Pitch Dropdown */}
+          <div className="flex items-center gap-1.5 bg-emerald-900/90 border border-emerald-700 rounded-xl px-2.5 py-1 text-xs">
+            <span className="text-emerald-300 font-medium text-[11px]">Timbre:</span>
+            <select
+              value={voicePitch}
+              onChange={(e) => setVoicePitch(Number(e.target.value))}
+              className="bg-transparent text-emerald-100 text-xs font-semibold focus:outline-none"
+            >
+              <option value={1.0} className="bg-gray-900 text-white">
+                1.00 (Neutral)
+              </option>
+              <option value={1.08} className="bg-gray-900 text-white">
+                1.08 (Warm Female)
+              </option>
+              <option value={1.15} className="bg-gray-900 text-white">
+                1.15 (Bright Female)
+              </option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -583,17 +800,26 @@ export default function InteractiveDemoPage() {
           <Mic className={`w-4 h-4 ${isSpeaking ? 'animate-bounce text-emerald-400' : ''}`} />
         </div>
         <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300">
-              Audio Explanation (Live Narration):
-            </span>
-            {isSpeaking && (
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-mono animate-pulse">
-                Speaking...
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+                Audio Explanation (Natural Human Female Narration):
               </span>
-            )}
+              {isSpeaking && (
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-mono animate-pulse">
+                  Speaking Live...
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => speakCurrentStep(step.voiceNarration)}
+              className="text-[11px] text-amber-300 hover:text-amber-200 flex items-center gap-1 hover:underline font-semibold"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              Replay Audio
+            </button>
           </div>
-          <p className="text-xs sm:text-sm text-gray-100 font-medium leading-snug mt-0.5">
+          <p className="text-xs sm:text-sm text-gray-100 font-medium leading-snug mt-1">
             "{step.voiceNarration}"
           </p>
         </div>
